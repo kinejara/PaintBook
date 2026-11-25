@@ -10,19 +10,27 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @Query(sort: \Paint.createdAt, order: .reverse) private var paints: [Paint]
+    @State private var showingNewPaint = false
 
     var body: some View {
         NavigationViewWrapper {
             List {
-                ForEach(items) { item in
+                ForEach(paints) { paint in
                     NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
+                        Text(paint.colorName)   // placeholder detail screen for now
                     } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+                        PaintRow(paint: paint)
                     }
                 }
-                .onDelete(perform: deleteItems)
+                .onDelete(perform: deletePaints)
+            }
+            .overlay {
+                if paints.isEmpty {
+                    ContentUnavailableView("No Paints Yet",
+                                           systemImage: "paintpalette",
+                                           description: Text("Tap + to add your first paint."))
+                }
             }
 #if os(macOS)
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
@@ -33,32 +41,33 @@ struct ContentView: View {
                     EditButton()
                 }
 #endif
+                
                 ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                    Button(action: addPaint) {
+                        Label("Add Paint", systemImage: "plus")
                     }
                 }
+            }
+            .sheet(isPresented: $showingNewPaint) {
+                PaintForm()
             }
         }
     }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
+    private func addPaint() {
+        showingNewPaint = true
     }
 
-    private func deleteItems(offsets: IndexSet) {
+    private func deletePaints(offsets: IndexSet) {
         withAnimation {
             for index in offsets {
-                modelContext.delete(items[index])
+                modelContext.delete(paints[index])
             }
         }
     }
 }
 
-fileprivate struct NavigationViewWrapper<Content: View>: View {
+struct NavigationViewWrapper<Content: View>: View {
     let content: () -> Content
 
     var body: some View {
@@ -66,7 +75,7 @@ fileprivate struct NavigationViewWrapper<Content: View>: View {
         NavigationSplitView {
             content()
         } detail: {
-            Text("Select an item")
+            Text("Select a paint")
         }
 #else
         NavigationStack {
@@ -76,7 +85,34 @@ fileprivate struct NavigationViewWrapper<Content: View>: View {
     }
 }
 
+struct PaintRow: View {
+    let paint: Paint
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(paint.swatch)
+                .frame(width: 36, height: 36)
+                .overlay(Circle().stroke(.secondary.opacity(0.3)))
+
+            VStack(alignment: .leading) {
+                Text(paint.colorName)
+                    .font(.headline)
+                Text("\(paint.brand) · \(paint.code)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Text(paint.sheen.rawValue)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .modelContainer(for: Paint.self, inMemory: true)
 }
