@@ -14,11 +14,11 @@ struct RootView: View {
             Tab("Library", systemImage: "books.vertical") {
                 ContentView()
             }
-            
-            Tab("Paint", systemImage: "paintbrush") {
-                Text("Paint here")
+
+            Tab("Rooms", systemImage: "house") {
+                RoomsView()
             }
-            
+
             Tab("Settings", systemImage: "gearshape") {
                 Text("Settings")
             }

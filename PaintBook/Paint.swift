@@ -15,7 +15,7 @@ enum Sheen: String, Codable, CaseIterable, Identifiable {
          satin = "Satin",
          semiGloss = "Semi-Gloss",
          gloss = "Gloss"
-    
+
     var id: Self { self }
 }
 
@@ -28,50 +28,84 @@ enum PaintBase: String, Codable, CaseIterable, Identifiable {
 final class Paint {
     var colorName: String = ""
     var brand: String = ""
-    
     var sheen: Sheen = Sheen.eggshell
     var base: PaintBase = PaintBase.water
     var code: String = ""
-    var room: String = ""
     var notes: String = ""
     var createdAt: Date = Date.now
-    
-    // Swatch stored as RGB components
+
+    // Swatch stored as sRGB components (0...1)
     var swatchRed: Double = 1
     var swatchGreen: Double = 1
     var swatchBlue: Double = 1
-    
-    @Relationship(deleteRule: .cascade) var photos: [PaintPhoto] = []
-    
-    init() {
-        
-    }
-    
+
+    var room: Room?
+
+    @Relationship(deleteRule: .cascade, inverse: \PaintPhoto.paint)
+    var photos: [PaintPhoto] = []
+
+    init() {}
+
+    /// Not stored itself; reads and writes the RGB components above.
     var swatch: Color {
-            get { Color(red: swatchRed, green: swatchGreen, blue: swatchBlue) }
-            set {
-                let c = newValue.resolve(in: EnvironmentValues())
-                swatchRed = Double(c.red)
-                swatchGreen = Double(c.green)
-                swatchBlue = Double(c.blue)
-            }
+        get { swatchRGB.color }
+        set { swatchRGB = RGB(newValue) }
+    }
+
+    var swatchRGB: RGB {
+        get { RGB(red: swatchRed, green: swatchGreen, blue: swatchBlue) }
+        set {
+            swatchRed = newValue.red
+            swatchGreen = newValue.green
+            swatchBlue = newValue.blue
         }
-    
+    }
+
+    /// Photos in the order they were added (SwiftData doesn't keep relationship order).
+    var sortedPhotos: [PaintPhoto] {
+        photos.sorted { $0.addedAt < $1.addedAt }
+    }
+
+    var displayName: String {
+        colorName.isEmpty ? "Untitled Paint" : colorName
+    }
+
+    /// "Brand · Code", skipping whichever is empty.
+    var subtitle: String {
+        [brand, code].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
     var shareSummary: String {
-            """
-            \(colorName) — \(brand)
-            Code: \(code)
-            \(sheen.rawValue), \(base.rawValue)
-            Room: \(room)
-            \(notes)
-            """
+        var lines = [displayName]
+        if !subtitle.isEmpty { lines.append(subtitle) }
+        lines.append("\(sheen.rawValue), \(base.rawValue)")
+        lines.append("Color: \(swatchRGB.hex)")
+        if let room { lines.append("Room: \(room.displayName)") }
+        if !notes.isEmpty { lines.append(notes) }
+        return lines.joined(separator: "\n")
+    }
+
+    /// A plain, thread-safe copy used for PDF export.
+    var snapshot: PaintSnapshot {
+        PaintSnapshot(
+            name: displayName,
+            subtitle: subtitle,
+            finish: "\(sheen.rawValue) · \(base.rawValue)",
+            room: room?.displayName,
+            notes: notes,
+            rgb: swatchRGB,
+            photos: sortedPhotos.prefix(3).map(\.data)
+        )
     }
 }
 
 @Model
 final class PaintPhoto {
-    @Attribute(.externalStorage) var data: Data
+    @Attribute(.externalStorage) var data: Data = Data()
+    var addedAt: Date = Date.now
     var paint: Paint?
-    
-    init(data: Data) { self.data = data }
+
+    init(data: Data) {
+        self.data = data
+    }
 }

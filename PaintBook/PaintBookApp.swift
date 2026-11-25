@@ -13,6 +13,8 @@ struct PaintBookApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Paint.self,
+            PaintPhoto.self,
+            Room.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
