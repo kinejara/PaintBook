@@ -143,6 +143,99 @@ struct ModelTests {
     }
 }
 
+// MARK: - Backup, CSV and sorting
+
+@MainActor
+struct BackupTests {
+    private func makeContext() throws -> ModelContext {
+        let container = try ModelContainer(for: Paint.self, PaintPhoto.self, Room.self,
+                                           configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        return ModelContext(container)
+    }
+
+    private func seed(_ context: ModelContext) throws {
+        let kitchen = Room(name: "Kitchen")
+        context.insert(kitchen)
+        let naval = Paint()
+        context.insert(naval)
+        naval.colorName = "Naval"
+        naval.brand = "Sherwin-Williams"
+        naval.sheen = .satin
+        naval.swatchRGB = RGB(red: 0.18, green: 0.23, blue: 0.31)
+        naval.room = kitchen
+        naval.photos.append(PaintPhoto(data: Data([1, 2, 3])))
+        let white = Paint()
+        context.insert(white)
+        white.colorName = "Chantilly Lace"
+        try context.save()
+    }
+
+    @Test func backupRoundTripsEverything() throws {
+        let source = try makeContext()
+        try seed(source)
+        let data = try LibraryBackup.makeBackup(from: source)
+
+        let destination = try makeContext()
+        let counts = try LibraryBackup.restore(data, into: destination, replacing: false)
+        #expect(counts.paints == 2 && counts.rooms == 1)
+
+        let paints = try destination.fetch(FetchDescriptor<Paint>())
+        let naval = try #require(paints.first { $0.colorName == "Naval" })
+        #expect(naval.brand == "Sherwin-Williams")
+        #expect(naval.sheen == .satin)
+        #expect(naval.swatchRGB.hex == RGB(red: 0.18, green: 0.23, blue: 0.31).hex)
+        #expect(naval.room?.name == "Kitchen")
+        #expect(naval.photos.first?.data == Data([1, 2, 3]))
+    }
+
+    @Test func addingReusesRoomsAndReplacingClearsFirst() throws {
+        let context = try makeContext()
+        try seed(context)
+        let data = try LibraryBackup.makeBackup(from: context)
+
+        try LibraryBackup.restore(data, into: context, replacing: false)
+        #expect(try context.fetchCount(FetchDescriptor<Paint>()) == 4)
+        #expect(try context.fetchCount(FetchDescriptor<Room>()) == 1) // same-named room reused
+
+        try LibraryBackup.restore(data, into: context, replacing: true)
+        #expect(try context.fetchCount(FetchDescriptor<Paint>()) == 2)
+        #expect(try context.fetchCount(FetchDescriptor<Room>()) == 1)
+        #expect(try context.fetchCount(FetchDescriptor<PaintPhoto>()) == 1)
+    }
+
+    @Test func rejectsFilesThatAreNotBackups() {
+        #expect(throws: LibraryBackup.BackupError.self) {
+            try LibraryBackup.inspect(Data("{\"hello\": 1}".utf8))
+        }
+        #expect(throws: LibraryBackup.BackupError.self) {
+            try LibraryBackup.inspect(Data("{\"version\": 99}".utf8))
+        }
+    }
+
+    @Test func csvQuotesFieldsThatNeedIt() throws {
+        #expect(LibraryBackup.csvField("plain") == "plain")
+        #expect(LibraryBackup.csvField("a, b") == "\"a, b\"")
+        #expect(LibraryBackup.csvField("say \"hi\"") == "\"say \"\"hi\"\"\"")
+        #expect(LibraryBackup.csvField("two\nlines") == "\"two\nlines\"")
+
+        let context = try makeContext()
+        try seed(context)
+        let csv = LibraryBackup.makeCSV(from: try context.fetch(FetchDescriptor<Paint>()))
+        let lines = csv.split(separator: "\r\n")
+        #expect(lines.count == 3)
+        #expect(lines[0] == "Name,Brand,Code,Sheen,Base,Color,Room,Notes,Added")
+    }
+
+    @Test func sortsByRoomWithUnassignedLast() throws {
+        let context = try makeContext()
+        try seed(context)
+        let sorted = PaintSort.room.sorted(try context.fetch(FetchDescriptor<Paint>()))
+        #expect(sorted.map(\.colorName) == ["Naval", "Chantilly Lace"])
+        let byName = PaintSort.name.sorted(sorted)
+        #expect(byName.map(\.colorName) == ["Chantilly Lace", "Naval"])
+    }
+}
+
 // MARK: - PDF export
 
 @MainActor
@@ -157,5 +250,16 @@ struct PDFExportTests {
         #expect(url.lastPathComponent == "Kitchen - Pantry.pdf") // slash removed from file name
         let document = try #require(CGPDFDocument(url as CFURL))
         #expect(document.numberOfPages == 2)
+    }
+
+    @Test func usesTheChosenPaperSize() throws {
+        let snapshot = PaintSnapshot(name: "Naval", subtitle: "", finish: "", room: nil, notes: "",
+                                     rgb: RGB(red: 0, green: 0, blue: 0), photos: [])
+        let url = try PaintSheetRenderer.writePDF(title: "A4", paints: [snapshot], paper: .a4)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        let page = try #require(CGPDFDocument(url as CFURL)?.page(at: 1))
+        let box = page.getBoxRect(.mediaBox)
+        #expect(box.width == 595 && box.height == 842)
     }
 }

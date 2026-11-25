@@ -24,7 +24,7 @@ final class Room {
     }
 
     var sortedPaints: [Paint] {
-        paints.sorted { $0.colorName.localizedStandardCompare($1.colorName) == .orderedAscending }
+        paints.live.sorted { $0.colorName.localizedStandardCompare($1.colorName) == .orderedAscending }
     }
 
     var shareSummary: String {

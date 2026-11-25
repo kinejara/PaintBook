@@ -32,7 +32,7 @@ struct ColorMatchView: View {
 
     private var matches: [Match] {
         guard let sample else { return [] }
-        return paints
+        return paints.live
             .map { Match(paint: $0, distance: sample.distance(to: $0.swatchRGB)) }
             .sorted { $0.distance < $1.distance }
             .prefix(3)

@@ -12,6 +12,14 @@ struct PaintDetailView: View {
     @State private var showingEditor = false
 
     var body: some View {
+        if paint.modelContext == nil || paint.isDeleted {
+            ContentUnavailableView("Paint Deleted", systemImage: "trash")
+        } else {
+            details
+        }
+    }
+
+    private var details: some View {
         List {
             Section {
                 SwatchView(color: paint.swatch, cornerRadius: 12)

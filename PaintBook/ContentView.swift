@@ -18,6 +18,7 @@ struct ContentView: View {
     @State private var searchText = ""
     @State private var roomFilter: Room?
     @State private var sheenFilter: Sheen?
+    @AppStorage(SettingsKey.paintSort) private var paintSort: PaintSort = .newest
 
     private var isFiltering: Bool {
         roomFilter != nil || sheenFilter != nil
@@ -25,7 +26,7 @@ struct ContentView: View {
 
     private var filteredPaints: [Paint] {
         let query = searchText.trimmingCharacters(in: .whitespaces)
-        return paints.filter { paint in
+        return paintSort.sorted(paints.live).filter { paint in
             if let roomFilter, paint.room != roomFilter { return false }
             if let sheenFilter, paint.sheen != sheenFilter { return false }
             guard !query.isEmpty else { return true }
@@ -112,9 +113,15 @@ struct ContentView: View {
 
     private var filterMenu: some View {
         Menu {
+            Picker("Sort By", selection: $paintSort) {
+                ForEach(PaintSort.allCases) { sort in
+                    Text(sort.rawValue).tag(sort)
+                }
+            }
+            Divider()
             Picker("Room", selection: $roomFilter) {
                 Text("All Rooms").tag(nil as Room?)
-                ForEach(rooms) { room in
+                ForEach(rooms.live) { room in
                     Text(room.displayName).tag(room as Room?)
                 }
             }
@@ -129,7 +136,7 @@ struct ContentView: View {
                 Button("Clear Filters", systemImage: "xmark") { clearFilters() }
             }
         } label: {
-            Label("Filter", systemImage: isFiltering
+            Label("Sort and Filter", systemImage: isFiltering
                   ? "line.3.horizontal.decrease.circle.fill"
                   : "line.3.horizontal.decrease.circle")
         }

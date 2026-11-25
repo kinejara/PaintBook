@@ -8,6 +8,14 @@
 import SwiftUI
 import SwiftData
 
+extension Array where Element: PersistentModel {
+    /// Drops models that were deleted (for example by "Replace Everything" in a restore).
+    /// Views can still hold them for a moment, and reading their properties then crashes.
+    var live: [Element] {
+        filter { $0.modelContext != nil && !$0.isDeleted }
+    }
+}
+
 /// A colour chip with a faint outline so white and very light colours stay visible.
 struct SwatchView: View {
     let color: Color
@@ -28,6 +36,15 @@ struct PaintRow: View {
     var showsRoom = true
 
     var body: some View {
+        // SwiftUI can redraw a row once more after its paint is deleted.
+        if paint.modelContext == nil || paint.isDeleted {
+            EmptyView()
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         HStack(spacing: 12) {
             SwatchView(color: paint.swatch, cornerRadius: 18)
                 .frame(width: 36, height: 36)

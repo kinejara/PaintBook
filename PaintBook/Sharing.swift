@@ -19,10 +19,10 @@ nonisolated struct PaintSnapshot: Hashable, Sendable {
 }
 
 enum PaintSheetRenderer {
-    static let pageSize = CGSize(width: 612, height: 792) // US Letter, in points
     static let paintsPerPage = 3
 
-    static func writePDF(title: String, paints: [PaintSnapshot]) throws -> URL {
+    static func writePDF(title: String, paints: [PaintSnapshot], paper: PaperSize = .letter) throws -> URL {
+        let pageSize = paper.pageSize
         let safeTitle = title
             .components(separatedBy: CharacterSet(charactersIn: "/\\:"))
             .joined(separator: "-")
@@ -151,6 +151,12 @@ struct ShareSection: View {
     let paints: [PaintSnapshot]
 
     @State private var pdfURL: URL?
+    @AppStorage(SettingsKey.paperSize) private var paperSize: PaperSize = .letter
+
+    private struct PDFInput: Hashable {
+        var paints: [PaintSnapshot]
+        var paper: PaperSize
+    }
 
     var body: some View {
         Section("Share") {
@@ -166,8 +172,8 @@ struct ShareSection: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .task(id: paints) {
-            pdfURL = try? PaintSheetRenderer.writePDF(title: title, paints: paints)
+        .task(id: PDFInput(paints: paints, paper: paperSize)) {
+            pdfURL = try? PaintSheetRenderer.writePDF(title: title, paints: paints, paper: paperSize)
         }
     }
 }

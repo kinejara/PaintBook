@@ -11,7 +11,7 @@ import SwiftData
 struct RootView: View {
     var body: some View {
         TabView {
-            Tab("Library", systemImage: "books.vertical") {
+            Tab("Paints", systemImage: "paintbrush") {
                 ContentView()
             }
 
@@ -20,7 +20,7 @@ struct RootView: View {
             }
 
             Tab("Settings", systemImage: "gearshape") {
-                Text("Settings")
+                SettingsView()
             }
         }
     }

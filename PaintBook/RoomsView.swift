@@ -14,7 +14,7 @@ struct RoomsView: View {
     var body: some View {
         NavigationStack {
             List {
-                ForEach(rooms) { room in
+                ForEach(rooms.live) { room in
                     NavigationLink {
                         RoomDetailView(room: room)
                     } label: {
@@ -47,7 +47,7 @@ struct RoomsView: View {
     private func deleteRooms(offsets: IndexSet) {
         withAnimation {
             for index in offsets {
-                modelContext.delete(rooms[index]) // its paints are kept, just unassigned
+                modelContext.delete(rooms.live[index]) // its paints are kept, just unassigned
             }
         }
     }
@@ -57,6 +57,14 @@ private struct RoomRow: View {
     let room: Room
 
     var body: some View {
+        if room.modelContext == nil || room.isDeleted {
+            EmptyView()
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         HStack(spacing: 12) {
             // Up to 5 overlapping swatches of the room's paints
             HStack(spacing: -10) {
@@ -69,7 +77,7 @@ private struct RoomRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(room.displayName).font(.headline)
-                Text(room.paints.count == 1 ? "1 paint" : "\(room.paints.count) paints")
+                Text(room.sortedPaints.count == 1 ? "1 paint" : "\(room.sortedPaints.count) paints")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -82,6 +90,14 @@ struct RoomDetailView: View {
     @State private var showingNewPaint = false
 
     var body: some View {
+        if room.modelContext == nil || room.isDeleted {
+            ContentUnavailableView("Room Deleted", systemImage: "trash")
+        } else {
+            details
+        }
+    }
+
+    private var details: some View {
         List {
             ForEach(room.sortedPaints) { paint in
                 NavigationLink {

@@ -37,8 +37,8 @@ struct PaintForm: View {
         self.paint = paint
         _colorName = State(initialValue: paint?.colorName ?? "")
         _brand = State(initialValue: paint?.brand ?? "")
-        _sheen = State(initialValue: paint?.sheen ?? .eggshell)
-        _base = State(initialValue: paint?.base ?? .water)
+        _sheen = State(initialValue: paint?.sheen ?? AppDefaults.sheen)
+        _base = State(initialValue: paint?.base ?? AppDefaults.base)
         _code = State(initialValue: paint?.code ?? "")
         _notes = State(initialValue: paint?.notes ?? "")
         _swatch = State(initialValue: paint?.swatch ?? .white)
@@ -182,7 +182,7 @@ struct PaintForm: View {
         Section("Room") {
             Picker("Room", selection: $room) {
                 Text("None").tag(nil as Room?)
-                ForEach(rooms) { room in
+                ForEach(rooms.live) { room in
                     Text(room.displayName).tag(room as Room?)
                 }
             }
