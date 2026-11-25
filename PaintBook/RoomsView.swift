@@ -10,6 +10,7 @@ struct RoomsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Room.name) private var rooms: [Room]
     @State private var showingNewRoom = false
+    @State private var roomToRename: Room?
 
     var body: some View {
         NavigationStack {
@@ -19,6 +20,13 @@ struct RoomsView: View {
                         RoomDetailView(room: room)
                     } label: {
                         RoomRow(room: room)
+                    }
+                    .swipeActions(edge: .leading) {
+                        Button("Rename", systemImage: "pencil") { roomToRename = room }
+                            .tint(.blue)
+                    }
+                    .contextMenu {
+                        Button("Rename", systemImage: "pencil") { roomToRename = room }
                     }
                 }
                 .onDelete(perform: deleteRooms)
@@ -32,7 +40,12 @@ struct RoomsView: View {
             }
             .navigationTitle("Rooms")
             .toolbar {
-                ToolbarItem {
+#if os(iOS)
+                ToolbarItem(placement: .topBarLeading) {
+                    EditButton()
+                }
+#endif
+                ToolbarItem(placement: .primaryAction) {
                     Button {
                         showingNewRoom = true
                     } label: {
@@ -41,6 +54,7 @@ struct RoomsView: View {
                 }
             }
             .newRoomAlert(isPresented: $showingNewRoom)
+            .renameRoomAlert(room: $roomToRename)
         }
     }
 
@@ -88,6 +102,7 @@ private struct RoomRow: View {
 struct RoomDetailView: View {
     let room: Room
     @State private var showingNewPaint = false
+    @State private var roomToRename: Room?
 
     var body: some View {
         if room.modelContext == nil || room.isDeleted {
@@ -129,6 +144,9 @@ struct RoomDetailView: View {
         .navigationTitle(room.displayName)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                Button("Rename") { roomToRename = room }
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     showingNewPaint = true
                 } label: {
@@ -139,5 +157,6 @@ struct RoomDetailView: View {
         .sheet(isPresented: $showingNewPaint) {
             PaintForm(room: room)
         }
+        .renameRoomAlert(room: $roomToRename)
     }
 }

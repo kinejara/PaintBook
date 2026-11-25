@@ -104,7 +104,40 @@ private struct NewRoomAlert: ViewModifier {
     }
 }
 
+/// Adds an alert that renames `room` while it's set, prefilled with the current name.
+private struct RenameRoomAlert: ViewModifier {
+    @Binding var room: Room?
+    @State private var name = ""
+
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .alert("Rename Room", isPresented: Binding(
+                get: { room != nil },
+                set: { if !$0 { room = nil } }
+            )) {
+                TextField("Name", text: $name)
+                Button("Cancel", role: .cancel) {}
+                // An empty name is ignored (alerts don't refresh a disabled state while typing).
+                Button("Save") {
+                    guard !trimmedName.isEmpty else { return }
+                    room?.name = trimmedName
+                }
+            }
+            .onChange(of: room, initial: true) { _, room in
+                name = room?.name ?? ""
+            }
+    }
+}
+
 extension View {
+    func renameRoomAlert(room: Binding<Room?>) -> some View {
+        modifier(RenameRoomAlert(room: room))
+    }
+
     func newRoomAlert(isPresented: Binding<Bool>,
                       onCreate: @escaping (Room) -> Void = { _ in }) -> some View {
         modifier(NewRoomAlert(isPresented: isPresented, onCreate: onCreate))
